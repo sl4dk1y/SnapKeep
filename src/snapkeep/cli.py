@@ -1,12 +1,13 @@
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional, Sequence
 
+from snapkeep import __version__
 from snapkeep.archive import create_archive
 from snapkeep.backup import collect_files
 from snapkeep.errors import SnapKeepError
 from snapkeep.ignore import load_ignore_patterns
-from typing import Optional, Sequence
 from snapkeep.security import (
     DEFAULT_EXCLUDE_PATTERNS,
     SECRET_EXCLUDE_PATTERNS,
@@ -54,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version="SnapKeep 0.1.0",
+        version=f"SnapKeep {__version__}",
     )
 
     return parser

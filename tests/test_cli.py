@@ -5,6 +5,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from snapkeep import __version__
 from snapkeep.cli import main
 from snapkeep.errors import ArchiveError
 
@@ -112,6 +113,18 @@ class CliTests(unittest.TestCase):
             stderr.getvalue(),
         )
 
+    def test_version_reports_package_version(self):
+        stdout = io.StringIO()
+
+        with redirect_stdout(stdout):
+            with self.assertRaises(SystemExit) as context:
+                main(["--version"])
+
+        self.assertEqual(context.exception.code, 0)
+        self.assertEqual(
+            stdout.getvalue().strip(),
+            f"SnapKeep {__version__}",
+        )
 
 if __name__ == "__main__":
     unittest.main()
