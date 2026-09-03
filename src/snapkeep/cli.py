@@ -1,6 +1,9 @@
 import argparse
 from pathlib import Path
 
+from snapkeep.backup import collect_files
+from snapkeep.ignore import load_ignore_patterns
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -20,6 +23,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         help="Directory where snapshots will be stored.",
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show which files would be included without creating a snapshot.",
     )
 
     parser.add_argument(
@@ -48,9 +57,27 @@ def main() -> int:
     else:
         output = args.output.expanduser().resolve()
 
+    ignore_file = source / ".backupignore"
+    patterns = load_ignore_patterns(ignore_file)
+    files = collect_files(source, patterns)
+
     print(f"Source:      {source}")
     print(f"Destination: {output}")
 
+    if args.dry_run:
+        print()
+        print("Files to include:")
+
+        for path in files:
+            print(f"  {path.relative_to(source).as_posix()}")
+
+        print()
+        print(f"Total files: {len(files)}")
+        print("Dry run: no snapshot was created.")
+        return 0
+
+    print()
+    print("Snapshot creation is not implemented yet.")
     return 0
 
 
