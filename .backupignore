@@ -1,0 +1,25 @@
+# Version control
+.git/
+
+# Python environments
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# OS metadata
+.DS_Store
+
+# Existing archives
+*.zip
