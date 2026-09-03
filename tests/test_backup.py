@@ -52,6 +52,35 @@ class CollectFilesTests(unittest.TestCase):
 
             self.assertEqual(relative_files, ["keep.txt"])
 
+class OutputExclusionTests(unittest.TestCase):
+    def test_output_directory_inside_source_is_excluded(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir)
+
+            (source / "keep.txt").write_text(
+                "keep",
+                encoding="utf-8",
+            )
+
+            output = source / "archive"
+            output.mkdir()
+            (output / "old-snapshot.zip").write_text(
+                "old archive",
+                encoding="utf-8",
+            )
+
+            files = collect_files(
+                source,
+                [],
+                excluded_directory=output,
+            )
+
+            relative_files = [
+                path.relative_to(source).as_posix()
+                for path in files
+            ]
+
+            self.assertEqual(relative_files, ["keep.txt"])
 
 if __name__ == "__main__":
     unittest.main()

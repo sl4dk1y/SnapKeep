@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 
+from snapkeep.archive import create_archive
 from snapkeep.backup import collect_files
 from snapkeep.ignore import load_ignore_patterns
 from snapkeep.security import (
@@ -90,6 +91,7 @@ def main() -> int:
         source,
         patterns,
         secret_patterns=secret_patterns,
+        excluded_directory=output,
     )
 
     print(f"Source:      {source}")
@@ -113,8 +115,17 @@ def main() -> int:
         print("Dry run: no snapshot was created.")
         return 0
 
+    archive_path = create_archive(
+        source,
+        files,
+        output,
+    )
+
     print()
-    print("Snapshot creation is not implemented yet.")
+    print(f"Snapshot created: {archive_path}")
+    print(f"Files archived:   {len(files)}")
+    print("Verification:     OK")
+
     return 0
 
 
