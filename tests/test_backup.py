@@ -82,10 +82,66 @@ class OutputExclusionTests(unittest.TestCase):
 
             self.assertEqual(relative_files, ["keep.txt"])
 
+class SymlinkCollectionTests(unittest.TestCase):
+    def test_symlink_to_file_is_not_collected(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            outside = root / "outside.txt"
+
+            source.mkdir()
+            outside.write_text(
+                "secret outside project",
+                encoding="utf-8",
+            )
+
+            link = source / "outside-link.txt"
+            link.symlink_to(outside)
+
+            files = collect_files(
+                source,
+                [],
+            )
+
+            self.assertNotIn(link, files)
+
+    def test_symlink_to_directory_is_not_traversed(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            outside = root / "outside"
+
+            source.mkdir()
+            outside.mkdir()
+
+            (outside / "secret.txt").write_text(
+                "secret outside project",
+                encoding="utf-8",
+            )
+
+            link = source / "outside-dir"
+            link.symlink_to(
+                outside,
+                target_is_directory=True,
+            )
+
+            files = collect_files(
+                source,
+                [],
+            )
+
+            relative_files = [
+                path.relative_to(source).as_posix()
+                for path in files
+            ]
+
+            self.assertNotIn(
+                "outside-dir/secret.txt",
+                relative_files,
+            )
+
 if __name__ == "__main__":
     unittest.main()
-
-
 class SecretExampleCollectionTests(unittest.TestCase):
     def test_secret_example_is_included(self):
         with tempfile.TemporaryDirectory() as temp_dir:

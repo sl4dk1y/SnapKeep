@@ -21,6 +21,9 @@ def collect_files(
         excluded_directory_resolved = excluded_directory.resolve()
 
     for path in source.rglob("*"):
+        if path.is_symlink():
+            continue
+
         if excluded_directory_resolved is not None:
             try:
                 path.resolve().relative_to(excluded_directory_resolved)

@@ -1,8 +1,10 @@
 import argparse
+import sys
 from pathlib import Path
 
 from snapkeep.archive import create_archive
 from snapkeep.backup import collect_files
+from snapkeep.errors import SnapKeepError
 from snapkeep.ignore import load_ignore_patterns
 from snapkeep.security import (
     DEFAULT_EXCLUDE_PATTERNS,
@@ -115,11 +117,15 @@ def main() -> int:
         print("Dry run: no snapshot was created.")
         return 0
 
-    archive_path = create_archive(
-        source,
-        files,
-        output,
-    )
+    try:
+        archive_path = create_archive(
+            source,
+            files,
+            output,
+        )
+    except SnapKeepError as error:
+        print(f"snapkeep: error: {error}", file=sys.stderr)
+        return 1
 
     print()
     print(f"Snapshot created: {archive_path}")
