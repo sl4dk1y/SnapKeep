@@ -6,6 +6,7 @@ from snapkeep.archive import create_archive
 from snapkeep.backup import collect_files
 from snapkeep.errors import SnapKeepError
 from snapkeep.ignore import load_ignore_patterns
+from typing import Optional, Sequence
 from snapkeep.security import (
     DEFAULT_EXCLUDE_PATTERNS,
     SECRET_EXCLUDE_PATTERNS,
@@ -59,9 +60,9 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     source = Path(args.source).expanduser().resolve()
 
