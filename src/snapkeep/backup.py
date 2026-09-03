@@ -2,9 +2,15 @@ from pathlib import Path
 from typing import Iterable
 
 from snapkeep.ignore import is_ignored
+from snapkeep.security import is_allowed_secret_example
 
 
-def collect_files(source: Path, patterns: Iterable[str]) -> list[Path]:
+def collect_files(
+    source: Path,
+    patterns: Iterable[str],
+    *,
+    secret_patterns: Iterable[str] = (),
+) -> list[Path]:
     """Collect files that should be included in a snapshot."""
     files: list[Path] = []
 
@@ -12,6 +18,12 @@ def collect_files(source: Path, patterns: Iterable[str]) -> list[Path]:
         relative_path = path.relative_to(source)
 
         if is_ignored(relative_path, patterns):
+            continue
+
+        if (
+            not is_allowed_secret_example(relative_path)
+            and is_ignored(relative_path, secret_patterns)
+        ):
             continue
 
         if path.is_file():

@@ -3,6 +3,10 @@ from pathlib import Path
 
 from snapkeep.backup import collect_files
 from snapkeep.ignore import load_ignore_patterns
+from snapkeep.security import (
+    DEFAULT_EXCLUDE_PATTERNS,
+    SECRET_EXCLUDE_PATTERNS,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,6 +36,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--include-secrets",
+        action="store_true",
+        help="Include files normally excluded as potential secrets.",
+    )
+
+    parser.add_argument(
+        "--no-default-excludes",
+        action="store_true",
+        help="Disable SnapKeep built-in technical exclusions.",
+    )
+
+    parser.add_argument(
         "--version",
         action="version",
         version="SnapKeep 0.1.0",
@@ -57,12 +73,33 @@ def main() -> int:
     else:
         output = args.output.expanduser().resolve()
 
+    patterns = []
+
+    if not args.no_default_excludes:
+        patterns.extend(DEFAULT_EXCLUDE_PATTERNS)
+
     ignore_file = source / ".backupignore"
-    patterns = load_ignore_patterns(ignore_file)
-    files = collect_files(source, patterns)
+    patterns.extend(load_ignore_patterns(ignore_file))
+
+    secret_patterns = []
+
+    if not args.include_secrets:
+        secret_patterns.extend(SECRET_EXCLUDE_PATTERNS)
+
+    files = collect_files(
+        source,
+        patterns,
+        secret_patterns=secret_patterns,
+    )
 
     print(f"Source:      {source}")
     print(f"Destination: {output}")
+
+    if args.include_secrets:
+        print("Warning: secret protection is disabled.")
+
+    if args.no_default_excludes:
+        print("Warning: built-in technical exclusions are disabled.")
 
     if args.dry_run:
         print()

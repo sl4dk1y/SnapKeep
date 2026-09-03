@@ -55,3 +55,64 @@ class CollectFilesTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SecretExampleCollectionTests(unittest.TestCase):
+    def test_secret_example_is_included(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir)
+
+            (source / ".env").write_text("SECRET=value", encoding="utf-8")
+            (source / ".env.example").write_text(
+                "SECRET=",
+                encoding="utf-8",
+            )
+
+            files = collect_files(
+                source,
+                [],
+                secret_patterns=[".env", ".env.*"],
+            )
+
+            relative_files = [
+                path.relative_to(source).as_posix()
+                for path in files
+            ]
+
+            self.assertEqual(relative_files, [".env.example"])
+
+    def test_user_ignore_overrides_secret_example_allowlist(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir)
+
+            (source / ".env.example").write_text(
+                "SECRET=",
+                encoding="utf-8",
+            )
+
+            files = collect_files(
+                source,
+                [".env.example"],
+                secret_patterns=[".env", ".env.*"],
+            )
+
+            self.assertEqual(files, [])
+
+    def test_technical_exclusion_overrides_secret_example_allowlist(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir)
+
+            git_dir = source / ".git"
+            git_dir.mkdir()
+            (git_dir / ".env.example").write_text(
+                "SECRET=",
+                encoding="utf-8",
+            )
+
+            files = collect_files(
+                source,
+                [".git/"],
+                secret_patterns=[".env", ".env.*"],
+            )
+
+            self.assertEqual(files, [])
