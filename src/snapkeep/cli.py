@@ -35,6 +35,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "-i",
+        "--ignore-file",
+        type=Path,
+        help="Use a custom ignore file instead of SOURCE/.backupignore.",
+    )
+
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show which files would be included without creating a snapshot.",
@@ -83,7 +90,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not args.no_default_excludes:
         patterns.extend(DEFAULT_EXCLUDE_PATTERNS)
 
-    ignore_file = source / ".backupignore"
+    if args.ignore_file is None:
+        ignore_file = source / ".backupignore"
+    else:
+        ignore_file = args.ignore_file.expanduser().resolve()
+
+        if not ignore_file.exists():
+            parser.error(f"ignore file does not exist: {ignore_file}")
+
+        if not ignore_file.is_file():
+            parser.error(f"ignore file is not a file: {ignore_file}")
+
     patterns.extend(load_ignore_patterns(ignore_file))
 
     secret_patterns = []

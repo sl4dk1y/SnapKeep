@@ -126,5 +126,100 @@ class CliTests(unittest.TestCase):
             f"SnapKeep {__version__}",
         )
 
+    def test_custom_ignore_file_replaces_default_backupignore(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            source.mkdir()
+
+            (source / "keep.txt").write_text(
+                "keep\n",
+                encoding="utf-8",
+            )
+            (source / "remove.txt").write_text(
+                "remove\n",
+                encoding="utf-8",
+            )
+            (source / ".backupignore").write_text(
+                "keep.txt\n",
+                encoding="utf-8",
+            )
+
+            custom_ignore = root / "custom.ignore"
+            custom_ignore.write_text(
+                "remove.txt\n",
+                encoding="utf-8",
+            )
+
+            stdout = io.StringIO()
+
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        str(source),
+                        "--ignore-file",
+                        str(custom_ignore),
+                        "--dry-run",
+                    ]
+                )
+
+            output = stdout.getvalue()
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("keep.txt", output)
+            self.assertIn(".backupignore", output)
+            self.assertNotIn("  remove.txt", output)
+
+    def test_missing_custom_ignore_file_uses_argparse_exit_code_two(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "project"
+            source.mkdir()
+
+            missing_ignore = Path(temp_dir) / "missing.ignore"
+
+            stderr = io.StringIO()
+
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as context:
+                    main(
+                        [
+                            str(source),
+                            "--ignore-file",
+                            str(missing_ignore),
+                            "--dry-run",
+                        ]
+                    )
+
+            self.assertEqual(context.exception.code, 2)
+            self.assertIn(
+                "ignore file does not exist",
+                stderr.getvalue(),
+            )
+
+    def test_custom_ignore_path_must_be_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            source.mkdir()
+
+            stderr = io.StringIO()
+
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as context:
+                    main(
+                        [
+                            str(source),
+                            "--ignore-file",
+                            str(root),
+                            "--dry-run",
+                        ]
+                    )
+
+            self.assertEqual(context.exception.code, 2)
+            self.assertIn(
+                "ignore file is not a file",
+                stderr.getvalue(),
+            )
+
 if __name__ == "__main__":
     unittest.main()
