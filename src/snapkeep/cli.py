@@ -42,6 +42,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "-n",
+        "--name",
+        help="Use a custom name for the snapshot archive.",
+    )
+
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show which files would be included without creating a snapshot.",
@@ -79,6 +85,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if not source.is_dir():
         parser.error(f"source is not a directory: {source}")
+
+    if args.name is not None:
+        if not args.name.strip():
+            parser.error("snapshot name cannot be empty")
+
+        if "/" in args.name or "\\" in args.name:
+            parser.error("snapshot name cannot contain path separators")
 
     if args.output is None:
         output = source.parent / "archive"
@@ -141,6 +154,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             source,
             files,
             output,
+            name=args.name,
         )
     except SnapKeepError as error:
         print(f"snapkeep: error: {error}", file=sys.stderr)

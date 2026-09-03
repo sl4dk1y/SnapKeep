@@ -221,5 +221,113 @@ class CliTests(unittest.TestCase):
                 stderr.getvalue(),
             )
 
+    def test_empty_snapshot_name_uses_argparse_exit_code_two(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "project"
+            source.mkdir()
+
+            stderr = io.StringIO()
+
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as context:
+                    main(
+                        [
+                            str(source),
+                            "--name",
+                            "",
+                            "--dry-run",
+                        ]
+                    )
+
+            self.assertEqual(context.exception.code, 2)
+            self.assertIn(
+                "snapshot name cannot be empty",
+                stderr.getvalue(),
+            )
+
+    def test_snapshot_name_cannot_contain_forward_slash(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "project"
+            source.mkdir()
+
+            stderr = io.StringIO()
+
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as context:
+                    main(
+                        [
+                            str(source),
+                            "--name",
+                            "foo/bar",
+                            "--dry-run",
+                        ]
+                    )
+
+            self.assertEqual(context.exception.code, 2)
+            self.assertIn(
+                "snapshot name cannot contain path separators",
+                stderr.getvalue(),
+            )
+
+    def test_snapshot_name_cannot_contain_backslash(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "project"
+            source.mkdir()
+
+            stderr = io.StringIO()
+
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit) as context:
+                    main(
+                        [
+                            str(source),
+                            "--name",
+                            r"foo\bar",
+                            "--dry-run",
+                        ]
+                    )
+
+            self.assertEqual(context.exception.code, 2)
+            self.assertIn(
+                "snapshot name cannot contain path separators",
+                stderr.getvalue(),
+            )
+
+    def test_creates_snapshot_with_custom_name(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            output = root / "archive"
+
+            source.mkdir()
+            (source / "file.txt").write_text(
+                "hello",
+                encoding="utf-8",
+            )
+
+            stdout = io.StringIO()
+
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        str(source),
+                        "--output",
+                        str(output),
+                        "--name",
+                        "before-refactor",
+                    ]
+                )
+
+            archives = list(
+                output.glob("before-refactor_BACKUP_*.zip")
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(len(archives), 1)
+            self.assertIn(
+                "Verification:     OK",
+                stdout.getvalue(),
+            )
+
 if __name__ == "__main__":
     unittest.main()

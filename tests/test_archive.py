@@ -28,6 +28,20 @@ class BuildArchiveNameTests(unittest.TestCase):
             "MyProject_BACKUP_20260903-201530.zip",
         )
 
+    def test_uses_custom_snapshot_name(self):
+        source = Path("/tmp/project")
+        timestamp = datetime(2026, 9, 3, 22, 30, 0)
+
+        archive_name = build_archive_name(
+            source,
+            timestamp=timestamp,
+            name="before-refactor",
+        )
+
+        self.assertEqual(
+            archive_name,
+            "before-refactor_BACKUP_20260903-223000.zip",
+        )
 
 class CreateArchiveTests(unittest.TestCase):
     def test_creates_zip_with_relative_paths(self):

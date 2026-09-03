@@ -10,16 +10,16 @@ def build_archive_name(
     source: Path,
     *,
     timestamp: Optional[datetime] = None,
+    name: Optional[str] = None,
 ) -> str:
     """Build a timestamped snapshot archive name."""
     if timestamp is None:
         timestamp = datetime.now()
 
-    project_name = source.name or "snapshot"
+    project_name = name if name is not None else source.name or "snapshot"
     stamp = timestamp.strftime("%Y%m%d-%H%M%S")
 
     return f"{project_name}_BACKUP_{stamp}.zip"
-
 
 def create_archive(
     source: Path,
@@ -27,11 +27,13 @@ def create_archive(
     destination: Path,
     *,
     timestamp: Optional[datetime] = None,
+    name: Optional[str] = None,
 ) -> Path:
     """Create and verify a ZIP snapshot."""
     archive_name = build_archive_name(
         source,
         timestamp=timestamp,
+        name=name,
     )
 
     archive_path = choose_archive_path(

@@ -13,6 +13,8 @@ files and directories to be excluded through a `.backupignore` file.
 - Snapshot any project or directory
 - Timestamped ZIP archives
 - Custom output directory with `--output`
+- Custom ignore file with `--ignore-file`
+- Custom snapshot archive name with `--name`
 - `.backupignore` exclusion rules
 - Built-in exclusions for common development artifacts
 - Secure-by-default exclusions for common secret files
@@ -75,6 +77,24 @@ Choose another destination:
 snapkeep /path/to/project --output /path/to/backups
 ```
 
+Use a custom ignore file instead of `SOURCE/.backupignore`:
+
+```bash
+snapkeep /path/to/project --ignore-file /path/to/custom.ignore
+```
+
+Use a custom snapshot name:
+
+```bash
+snapkeep /path/to/project --name before-refactor
+```
+
+This creates an archive such as:
+
+```text
+before-refactor_BACKUP_20260903-223000.zip
+```
+
 Preview which files would be included without creating an archive:
 
 ```bash
@@ -89,8 +109,11 @@ snapkeep --version
 
 ## `.backupignore`
 
-If a `.backupignore` file exists in the source directory, SnapKeep uses it to
-exclude matching files and directories.
+If a `.backupignore` file exists in the source directory, SnapKeep uses it to exclude matching files and directories.
+
+By default, SnapKeep reads ignore patterns from `SOURCE/.backupignore`.
+
+You can replace it with another file by using `--ignore-file FILE`. The custom ignore file replaces `SOURCE/.backupignore`; built-in technical exclusions and secret protection still apply independently.
 
 Example:
 
@@ -211,8 +234,6 @@ should be extracted to a separate directory, inspected, and restored manually.
 Planned areas include:
 
 - Improved `.backupignore` functionality
-- Custom ignore-file selection
-- Custom archive names
 - Standalone archive verification
 - Windows, macOS, and Linux packaging
 - macOS Finder Quick Action integration
