@@ -4,6 +4,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
+from zipfile import ZipFile
 
 from snapkeep import __version__
 from snapkeep.cli import main
@@ -327,6 +328,83 @@ class CliTests(unittest.TestCase):
             self.assertIn(
                 "Verification:     OK",
                 stdout.getvalue(),
+            )
+
+    def test_verify_existing_archive_successfully(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            archive_path = Path(temp_dir) / "valid.zip"
+
+            with ZipFile(archive_path, "w") as archive:
+                archive.writestr("file.txt", "hello")
+
+            stdout = io.StringIO()
+
+            with redirect_stdout(stdout):
+                exit_code = main(["verify", str(archive_path)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn(
+                "Verification: OK",
+                stdout.getvalue(),
+            )
+
+    def test_verify_broken_archive_returns_exit_code_one(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            archive_path = Path(temp_dir) / "broken.zip"
+            archive_path.write_text(
+                "not a zip archive",
+                encoding="utf-8",
+            )
+
+            stderr = io.StringIO()
+
+            with redirect_stderr(stderr):
+                exit_code = main(["verify", str(archive_path)])
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "archive verification failed",
+                stderr.getvalue(),
+            )
+            self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_verify_missing_archive_returns_exit_code_one(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            archive_path = Path(temp_dir) / "missing.zip"
+            stderr = io.StringIO()
+
+            with redirect_stderr(stderr):
+                exit_code = main(["verify", str(archive_path)])
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "archive does not exist",
+                stderr.getvalue(),
+            )
+
+    def test_verify_without_archive_returns_exit_code_two(self):
+        stderr = io.StringIO()
+
+        with redirect_stderr(stderr):
+            exit_code = main(["verify"])
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn(
+            "usage: snapkeep verify ARCHIVE",
+            stderr.getvalue(),
+        )
+
+    def test_verify_directory_returns_exit_code_one(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            stderr = io.StringIO()
+
+            with redirect_stderr(stderr):
+                exit_code = main(["verify", temp_dir])
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "archive is not a file",
+                stderr.getvalue(),
             )
 
 if __name__ == "__main__":

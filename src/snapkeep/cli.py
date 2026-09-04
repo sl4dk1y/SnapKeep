@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 from snapkeep import __version__
-from snapkeep.archive import create_archive
+from snapkeep.archive import create_archive, verify_archive
 from snapkeep.backup import collect_files
 from snapkeep.errors import SnapKeepError
 from snapkeep.ignore import load_ignore_patterns
@@ -13,6 +13,33 @@ from snapkeep.security import (
     SECRET_EXCLUDE_PATTERNS,
 )
 
+def verify_existing_archive(archive_arg: str) -> int:
+    archive_path = Path(archive_arg).expanduser().resolve()
+
+    if not archive_path.exists():
+        print(
+            f"snapkeep: error: archive does not exist: {archive_path}",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not archive_path.is_file():
+        print(
+            f"snapkeep: error: archive is not a file: {archive_path}",
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        verify_archive(archive_path)
+    except SnapKeepError as error:
+        print(f"snapkeep: error: {error}", file=sys.stderr)
+        return 1
+
+    print(f"Archive:      {archive_path}")
+    print("Verification: OK")
+
+    return 0
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -73,8 +100,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     return parser
 
-
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+
+    if argv and argv[0] == "verify":
+        if len(argv) != 2:
+            print(
+                "usage: snapkeep verify ARCHIVE",
+                file=sys.stderr,
+            )
+            return 2
+
+        return verify_existing_archive(argv[1])
+
     parser = build_parser()
     args = parser.parse_args(argv)
 

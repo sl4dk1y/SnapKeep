@@ -25,6 +25,7 @@ files and directories to be excluded through a `.backupignore` file.
 - Collision-safe archive naming
 - Protection against including the output directory in its own snapshot
 - Symbolic links are skipped and their targets are never followed
+- Standalone archive verification with `snapkeep verify`
 
 ## Requirements
 
@@ -106,6 +107,15 @@ Show the installed version:
 ```bash
 snapkeep --version
 ```
+
+Verify an existing snapshot archive:
+
+    snapkeep verify /path/to/project_BACKUP_20260904-205000.zip
+
+A successful verification prints:
+
+    Archive:      /path/to/project_BACKUP_20260904-205000.zip
+    Verification: OK
 
 ## `.backupignore`
 
@@ -234,7 +244,6 @@ should be extracted to a separate directory, inspected, and restored manually.
 Planned areas include:
 
 - Improved `.backupignore` functionality
-- Standalone archive verification
 - Windows, macOS, and Linux packaging
 - macOS Finder Quick Action integration
 - Windows Explorer integration
