@@ -33,6 +33,26 @@ files and directories to be excluded through a `.backupignore` file.
 
 SnapKeep currently uses only the Python standard library at runtime.
 
+## Installation
+
+The recommended way to install SnapKeep as a command-line application is with `pipx`:
+
+```bash
+pipx install snapkeep
+```
+
+Alternatively, install it with pip:
+
+```bash
+python -m pip install snapkeep
+```
+
+To install the latest development version directly from GitHub:
+
+```bash
+pipx install "git+https://github.com/sl4dk1y/SnapKeep.git@main"
+```
+
 ## Installation for development
 
 Clone the repository, create a virtual environment, and install SnapKeep in

@@ -4,14 +4,45 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "snapkeep"
-version = "0.1.0a1"
-description = "A cross-platform project snapshot and backup tool."
+version = "0.1.0a2"
+description = "A cross-platform project snapshot and backup CLI."
+readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
-    { name = "SnapKeep contributors" }
+    { name = "sl4dk1y" }
+]
+keywords = [
+    "backup",
+    "snapshot",
+    "cli",
+    "zip",
+    "developer-tools",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: System :: Archiving :: Backup",
 ]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/sl4dk1y/SnapKeep"
+Repository = "https://github.com/sl4dk1y/SnapKeep"
+Issues = "https://github.com/sl4dk1y/SnapKeep/issues"
+Documentation = "https://github.com/sl4dk1y/SnapKeep#readme"
 
 [project.scripts]
 snapkeep = "snapkeep.cli:main"
