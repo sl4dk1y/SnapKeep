@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 WRAPPER = ROOT / "integrations/macos/snapkeep-finder.sh"
 
 
+@unittest.skipUnless(os.name == "posix" and sys.platform == "darwin",
+                     "Finder wrapper tests require macOS")
 class FinderWrapperTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
