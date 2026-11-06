@@ -13,85 +13,71 @@ from snapkeep.security import (
     SECRET_EXCLUDE_PATTERNS,
 )
 
-def verify_existing_archive(archive_arg: str) -> int:
-    archive_path = Path(archive_arg).expanduser().resolve()
 
-    if not archive_path.exists():
-        print(
-            f"snapkeep: error: archive does not exist: {archive_path}",
-            file=sys.stderr,
-        )
-        return 1
-
-    if not archive_path.is_file():
-        print(
-            f"snapkeep: error: archive is not a file: {archive_path}",
-            file=sys.stderr,
-        )
-        return 1
+def verify_existing_archive(archive_name: str) -> int:
+    archive_path = Path(archive_name).expanduser()
 
     try:
+        if not archive_path.exists():
+            raise OSError(f"archive does not exist: {archive_path}")
+
+        if not archive_path.is_file():
+            raise OSError(f"archive is not a file: {archive_path}")
+
         verify_archive(archive_path)
     except SnapKeepError as error:
         print(f"snapkeep: error: {error}", file=sys.stderr)
         return 1
+    except (OSError, ValueError, RuntimeError) as error:
+        print(f"snapkeep: error: could not access archive: {error}", file=sys.stderr)
+        return 1
 
     print(f"Archive:      {archive_path}")
     print("Verification: OK")
-
     return 0
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="snapkeep",
-        description="Create safe snapshots of project directories.",
+        description="Create a timestamped ZIP snapshot of a project directory.",
     )
 
     parser.add_argument(
         "source",
         nargs="?",
         default=".",
-        help="Directory to snapshot (default: current directory).",
+        help="source project directory (default: current directory)",
     )
-
     parser.add_argument(
-        "-o",
         "--output",
         type=Path,
-        help="Directory where snapshots will be stored.",
+        help="archive destination directory (default: sibling archive directory)",
     )
-
     parser.add_argument(
-        "-i",
+        "--name",
+        help="custom snapshot name",
+    )
+    parser.add_argument(
         "--ignore-file",
         type=Path,
-        help="Use a custom ignore file instead of SOURCE/.backupignore.",
+        help="use a custom ignore file instead of SOURCE/.backupignore",
     )
-
-    parser.add_argument(
-        "-n",
-        "--name",
-        help="Use a custom name for the snapshot archive.",
-    )
-
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show which files would be included without creating a snapshot.",
-    )
-
     parser.add_argument(
         "--include-secrets",
         action="store_true",
-        help="Include files normally excluded as potential secrets.",
+        help="include files normally excluded as secrets",
     )
-
     parser.add_argument(
         "--no-default-excludes",
         action="store_true",
-        help="Disable SnapKeep built-in technical exclusions.",
+        help="disable built-in technical exclusions",
     )
-
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="show files that would be archived without creating a ZIP file",
+    )
     parser.add_argument(
         "--version",
         action="version",
@@ -99,6 +85,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+def _report_operational_error(error: BaseException) -> int:
+    print(f"snapkeep: error: {error}", file=sys.stderr)
+    return 1
+
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     if argv is None:
@@ -117,12 +109,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    source = Path(args.source).expanduser().resolve()
+    try:
+        source = Path(args.source).expanduser().resolve(strict=True)
+        source_stat = source.stat()
+    except FileNotFoundError:
+        parser.error(f"source does not exist: {Path(args.source).expanduser()}")
+    except (OSError, RuntimeError, ValueError) as error:
+        return _report_operational_error(
+            f"could not access source directory: {error}"
+        )
 
-    if not source.exists():
-        parser.error(f"source does not exist: {source}")
-
-    if not source.is_dir():
+    if not stat_is_directory(source_stat.st_mode):
         parser.error(f"source is not a directory: {source}")
 
     if args.name is not None:
@@ -132,40 +129,64 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if "/" in args.name or "\\" in args.name:
             parser.error("snapshot name cannot contain path separators")
 
-    if args.output is None:
-        output = source.parent / "archive"
+    try:
+        if args.output is None:
+            output = source.parent / "archive"
+        else:
+            output = args.output.expanduser().resolve()
+    except (OSError, RuntimeError, ValueError) as error:
+        return _report_operational_error(
+            f"could not access output destination: {error}"
+        )
+
+    if args.no_default_excludes:
+        patterns = []
     else:
-        output = args.output.expanduser().resolve()
-
-    patterns = []
-
-    if not args.no_default_excludes:
-        patterns.extend(DEFAULT_EXCLUDE_PATTERNS)
+        patterns = list(DEFAULT_EXCLUDE_PATTERNS)
 
     if args.ignore_file is None:
         ignore_file = source / ".backupignore"
+        missing_ignore_ok = True
     else:
-        ignore_file = args.ignore_file.expanduser().resolve()
+        try:
+            ignore_file = args.ignore_file.expanduser().resolve(strict=True)
+            ignore_stat = ignore_file.stat()
+        except FileNotFoundError:
+            parser.error(
+                f"ignore file does not exist: {args.ignore_file.expanduser()}"
+            )
+        except (OSError, RuntimeError, ValueError) as error:
+            return _report_operational_error(
+                f"could not access ignore file: {error}"
+            )
 
-        if not ignore_file.exists():
-            parser.error(f"ignore file does not exist: {ignore_file}")
-
-        if not ignore_file.is_file():
+        if not stat_is_regular_file(ignore_stat.st_mode):
             parser.error(f"ignore file is not a file: {ignore_file}")
 
-    patterns.extend(load_ignore_patterns(ignore_file))
+        missing_ignore_ok = False
 
-    secret_patterns = []
-
-    if not args.include_secrets:
-        secret_patterns.extend(SECRET_EXCLUDE_PATTERNS)
-
-    files = collect_files(
-        source,
-        patterns,
-        secret_patterns=secret_patterns,
-        excluded_directory=output,
-    )
+    try:
+        patterns.extend(
+            load_ignore_patterns(
+                ignore_file,
+                missing_ok=missing_ignore_ok,
+            )
+        )
+        secret_patterns = (
+            [] if args.include_secrets else list(SECRET_EXCLUDE_PATTERNS)
+        )
+        files = collect_files(
+            source,
+            patterns,
+            secret_patterns=secret_patterns,
+            excluded_directory=output,
+        )
+    except SnapKeepError as error:
+        return _report_operational_error(error)
+    except (OSError, UnicodeError, ValueError, RuntimeError) as error:
+        return _report_operational_error(
+            f"could not collect project files: {error}"
+        )
 
     print(f"Source:      {source}")
     print(f"Destination: {output}")
@@ -203,9 +224,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"Snapshot created: {archive_path}")
     print(f"Files archived:   {len(files)}")
     print("Verification:     OK")
-
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+def stat_is_directory(mode: int) -> bool:
+    import stat
+    return stat.S_ISDIR(mode)
+
+
+def stat_is_regular_file(mode: int) -> bool:
+    import stat
+    return stat.S_ISREG(mode)

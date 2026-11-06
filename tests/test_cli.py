@@ -17,155 +17,111 @@ class CliTests(unittest.TestCase):
             root = Path(temp_dir)
             source = root / "project"
             output = root / "archive"
-
             source.mkdir()
-            (source / "file.txt").write_text(
-                "hello",
-                encoding="utf-8",
-            )
-
+            (source / "file.txt").write_text("hello", encoding="utf-8")
             stdout = io.StringIO()
-
             with redirect_stdout(stdout):
-                exit_code = main(
-                    [
-                        str(source),
-                        "--output",
-                        str(output),
-                        "--dry-run",
-                    ]
-                )
-
+                exit_code = main([str(source), "--output", str(output), "--dry-run"])
             self.assertEqual(exit_code, 0)
             self.assertFalse(output.exists())
             self.assertIn("file.txt", stdout.getvalue())
-            self.assertIn(
-                "Dry run: no snapshot was created.",
-                stdout.getvalue(),
-            )
+            self.assertIn("Dry run: no snapshot was created.", stdout.getvalue())
 
     def test_creates_snapshot_successfully(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             source = root / "project"
             output = root / "archive"
-
             source.mkdir()
-            (source / "file.txt").write_text(
-                "hello",
-                encoding="utf-8",
-            )
-
+            (source / "file.txt").write_text("hello", encoding="utf-8")
             stdout = io.StringIO()
-
             with redirect_stdout(stdout):
-                exit_code = main(
-                    [
-                        str(source),
-                        "--output",
-                        str(output),
-                    ]
-                )
-
+                exit_code = main([str(source), "--output", str(output)])
             self.assertEqual(exit_code, 0)
-            self.assertEqual(
-                len(list(output.glob("*.zip"))),
-                1,
-            )
-            self.assertIn(
-                "Verification:     OK",
-                stdout.getvalue(),
-            )
+            self.assertEqual(len(list(output.glob("*.zip"))), 1)
+            self.assertIn("Verification:     OK", stdout.getvalue())
+
+    def test_default_destination_is_a_sibling_archive_directory(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parent = Path(temp_dir)
+            source = parent / "project"
+            source.mkdir()
+            (source / "file.txt").write_text("hello", encoding="utf-8")
+            with redirect_stdout(io.StringIO()):
+                exit_code = main([str(source)])
+            archives = list((parent / "archive").glob("*.zip"))
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(len(archives), 1)
+            with ZipFile(archives[0]) as archive:
+                self.assertEqual(archive.namelist(), ["file.txt"])
 
     def test_archive_error_returns_exit_code_one_without_traceback(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             source = Path(temp_dir) / "project"
             source.mkdir()
-
-            stdout = io.StringIO()
             stderr = io.StringIO()
-
             with patch(
                 "snapkeep.cli.create_archive",
                 side_effect=ArchiveError("simulated failure"),
             ):
-                with redirect_stdout(stdout), redirect_stderr(stderr):
+                with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
                     exit_code = main([str(source)])
-
-            error_output = stderr.getvalue()
-
             self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "snapkeep: error: simulated failure",
-                error_output,
-            )
-            self.assertNotIn("Traceback", error_output)
+            self.assertIn("snapkeep: error: simulated failure", stderr.getvalue())
+            self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_missing_source_uses_argparse_exit_code_two(self):
         stderr = io.StringIO()
-
         with redirect_stderr(stderr):
             with self.assertRaises(SystemExit) as context:
                 main(["/path/that/does/not/exist"])
-
         self.assertEqual(context.exception.code, 2)
-        self.assertIn(
-            "source does not exist",
-            stderr.getvalue(),
-        )
+        self.assertIn("source does not exist", stderr.getvalue())
+
+    def test_invalid_source_path_returns_error_without_traceback(self):
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            exit_code = main(["bad\x00path"])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("snapkeep: error:", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_source_permission_failure_returns_error_without_traceback(self):
+        stderr = io.StringIO()
+        with patch(
+            "snapkeep.cli.Path.resolve",
+            side_effect=PermissionError("permission denied"),
+        ):
+            with redirect_stderr(stderr):
+                exit_code = main(["/private/project"])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("could not access source directory", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_version_reports_package_version(self):
         stdout = io.StringIO()
-
         with redirect_stdout(stdout):
             with self.assertRaises(SystemExit) as context:
                 main(["--version"])
-
         self.assertEqual(context.exception.code, 0)
-        self.assertEqual(
-            stdout.getvalue().strip(),
-            f"SnapKeep {__version__}",
-        )
+        self.assertEqual(stdout.getvalue().strip(), f"SnapKeep {__version__}")
 
     def test_custom_ignore_file_replaces_default_backupignore(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             source = root / "project"
             source.mkdir()
-
-            (source / "keep.txt").write_text(
-                "keep\n",
-                encoding="utf-8",
-            )
-            (source / "remove.txt").write_text(
-                "remove\n",
-                encoding="utf-8",
-            )
-            (source / ".backupignore").write_text(
-                "keep.txt\n",
-                encoding="utf-8",
-            )
-
+            (source / "keep.txt").write_text("keep\n", encoding="utf-8")
+            (source / "remove.txt").write_text("remove\n", encoding="utf-8")
+            (source / ".backupignore").write_text("keep.txt\n", encoding="utf-8")
             custom_ignore = root / "custom.ignore"
-            custom_ignore.write_text(
-                "remove.txt\n",
-                encoding="utf-8",
-            )
-
+            custom_ignore.write_text("remove.txt\n", encoding="utf-8")
             stdout = io.StringIO()
-
             with redirect_stdout(stdout):
                 exit_code = main(
-                    [
-                        str(source),
-                        "--ignore-file",
-                        str(custom_ignore),
-                        "--dry-run",
-                    ]
+                    [str(source), "--ignore-file", str(custom_ignore), "--dry-run"]
                 )
-
             output = stdout.getvalue()
-
             self.assertEqual(exit_code, 0)
             self.assertIn("keep.txt", output)
             self.assertIn(".backupignore", output)
@@ -175,237 +131,175 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             source = Path(temp_dir) / "project"
             source.mkdir()
-
             missing_ignore = Path(temp_dir) / "missing.ignore"
-
             stderr = io.StringIO()
-
             with redirect_stderr(stderr):
                 with self.assertRaises(SystemExit) as context:
-                    main(
-                        [
-                            str(source),
-                            "--ignore-file",
-                            str(missing_ignore),
-                            "--dry-run",
-                        ]
-                    )
-
+                    main([str(source), "--ignore-file", str(missing_ignore), "--dry-run"])
             self.assertEqual(context.exception.code, 2)
-            self.assertIn(
-                "ignore file does not exist",
-                stderr.getvalue(),
-            )
+            self.assertIn("ignore file does not exist", stderr.getvalue())
 
     def test_custom_ignore_path_must_be_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             source = root / "project"
             source.mkdir()
-
             stderr = io.StringIO()
-
             with redirect_stderr(stderr):
                 with self.assertRaises(SystemExit) as context:
-                    main(
-                        [
-                            str(source),
-                            "--ignore-file",
-                            str(root),
-                            "--dry-run",
-                        ]
-                    )
-
+                    main([str(source), "--ignore-file", str(root), "--dry-run"])
             self.assertEqual(context.exception.code, 2)
-            self.assertIn(
-                "ignore file is not a file",
-                stderr.getvalue(),
-            )
+            self.assertIn("ignore file is not a file", stderr.getvalue())
+
+    def test_unreadable_custom_ignore_returns_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            source.mkdir()
+            ignore_file = root / "custom.ignore"
+            ignore_file.write_text("*.tmp\n", encoding="utf-8")
+            stderr = io.StringIO()
+            with patch(
+                "snapkeep.ignore.Path.open",
+                side_effect=PermissionError("permission denied"),
+            ):
+                with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+                    exit_code = main([str(source), "--ignore-file", str(ignore_file)])
+            self.assertEqual(exit_code, 1)
+            self.assertIn("could not read ignore file", stderr.getvalue())
+            self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_malformed_utf8_custom_ignore_returns_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            source.mkdir()
+            ignore_file = root / "custom.ignore"
+            ignore_file.write_bytes(b"\xff")
+            stderr = io.StringIO()
+            with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+                exit_code = main([str(source), "--ignore-file", str(ignore_file)])
+            self.assertEqual(exit_code, 1)
+            self.assertIn("could not read ignore file", stderr.getvalue())
+            self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_invalid_output_destination_returns_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            source.mkdir()
+            output = root / "output-file"
+            output.write_text("not a directory", encoding="utf-8")
+            stderr = io.StringIO()
+            with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+                exit_code = main([str(source), "--output", str(output)])
+            self.assertEqual(exit_code, 1)
+            self.assertIn("could not create snapshot archive", stderr.getvalue())
+            self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_collection_permission_error_returns_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "project"
+            source.mkdir()
+            stderr = io.StringIO()
+            with patch(
+                "snapkeep.cli.collect_files",
+                side_effect=PermissionError("permission denied"),
+            ):
+                with redirect_stdout(io.StringIO()), redirect_stderr(stderr):
+                    exit_code = main([str(source), "--dry-run"])
+            self.assertEqual(exit_code, 1)
+            self.assertIn("could not collect project files", stderr.getvalue())
+            self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_empty_snapshot_name_uses_argparse_exit_code_two(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             source = Path(temp_dir) / "project"
             source.mkdir()
-
             stderr = io.StringIO()
-
             with redirect_stderr(stderr):
                 with self.assertRaises(SystemExit) as context:
-                    main(
-                        [
-                            str(source),
-                            "--name",
-                            "",
-                            "--dry-run",
-                        ]
-                    )
-
+                    main([str(source), "--name", "", "--dry-run"])
             self.assertEqual(context.exception.code, 2)
-            self.assertIn(
-                "snapshot name cannot be empty",
-                stderr.getvalue(),
-            )
+            self.assertIn("snapshot name cannot be empty", stderr.getvalue())
 
     def test_snapshot_name_cannot_contain_forward_slash(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             source = Path(temp_dir) / "project"
             source.mkdir()
-
             stderr = io.StringIO()
-
             with redirect_stderr(stderr):
                 with self.assertRaises(SystemExit) as context:
-                    main(
-                        [
-                            str(source),
-                            "--name",
-                            "foo/bar",
-                            "--dry-run",
-                        ]
-                    )
-
+                    main([str(source), "--name", "bad/name", "--dry-run"])
             self.assertEqual(context.exception.code, 2)
-            self.assertIn(
-                "snapshot name cannot contain path separators",
-                stderr.getvalue(),
-            )
+            self.assertIn("snapshot name cannot contain path separators", stderr.getvalue())
 
     def test_snapshot_name_cannot_contain_backslash(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             source = Path(temp_dir) / "project"
             source.mkdir()
-
             stderr = io.StringIO()
-
             with redirect_stderr(stderr):
                 with self.assertRaises(SystemExit) as context:
-                    main(
-                        [
-                            str(source),
-                            "--name",
-                            r"foo\bar",
-                            "--dry-run",
-                        ]
-                    )
-
+                    main([str(source), "--name", r"bad\name", "--dry-run"])
             self.assertEqual(context.exception.code, 2)
-            self.assertIn(
-                "snapshot name cannot contain path separators",
-                stderr.getvalue(),
-            )
+            self.assertIn("snapshot name cannot contain path separators", stderr.getvalue())
 
     def test_creates_snapshot_with_custom_name(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             source = root / "project"
-            output = root / "archive"
-
             source.mkdir()
-            (source / "file.txt").write_text(
-                "hello",
-                encoding="utf-8",
-            )
-
-            stdout = io.StringIO()
-
-            with redirect_stdout(stdout):
-                exit_code = main(
-                    [
-                        str(source),
-                        "--output",
-                        str(output),
-                        "--name",
-                        "before-refactor",
-                    ]
-                )
-
-            archives = list(
-                output.glob("before-refactor_BACKUP_*.zip")
-            )
-
+            (source / "file.txt").write_text("hello", encoding="utf-8")
+            output = root / "archive"
+            with redirect_stdout(io.StringIO()):
+                exit_code = main([str(source), "--output", str(output), "--name", "custom"])
             self.assertEqual(exit_code, 0)
-            self.assertEqual(len(archives), 1)
-            self.assertIn(
-                "Verification:     OK",
-                stdout.getvalue(),
-            )
+            self.assertEqual(len(list(output.glob("custom_BACKUP_*.zip"))), 1)
 
     def test_verify_existing_archive_successfully(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            archive_path = Path(temp_dir) / "valid.zip"
-
+            archive_path = Path(temp_dir) / "test.zip"
             with ZipFile(archive_path, "w") as archive:
                 archive.writestr("file.txt", "hello")
-
             stdout = io.StringIO()
-
             with redirect_stdout(stdout):
                 exit_code = main(["verify", str(archive_path)])
-
             self.assertEqual(exit_code, 0)
-            self.assertIn(
-                "Verification: OK",
-                stdout.getvalue(),
-            )
+            self.assertIn("Verification: OK", stdout.getvalue())
 
     def test_verify_broken_archive_returns_exit_code_one(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             archive_path = Path(temp_dir) / "broken.zip"
-            archive_path.write_text(
-                "not a zip archive",
-                encoding="utf-8",
-            )
-
+            archive_path.write_text("bad", encoding="utf-8")
             stderr = io.StringIO()
-
             with redirect_stderr(stderr):
                 exit_code = main(["verify", str(archive_path)])
-
             self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "archive verification failed",
-                stderr.getvalue(),
-            )
-            self.assertNotIn("Traceback", stderr.getvalue())
+            self.assertIn("verification failed", stderr.getvalue())
 
     def test_verify_missing_archive_returns_exit_code_one(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            archive_path = Path(temp_dir) / "missing.zip"
-            stderr = io.StringIO()
-
-            with redirect_stderr(stderr):
-                exit_code = main(["verify", str(archive_path)])
-
-            self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "archive does not exist",
-                stderr.getvalue(),
-            )
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            exit_code = main(["verify", "/missing/snap.zip"])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("archive does not exist", stderr.getvalue())
 
     def test_verify_without_archive_returns_exit_code_two(self):
         stderr = io.StringIO()
-
         with redirect_stderr(stderr):
             exit_code = main(["verify"])
-
         self.assertEqual(exit_code, 2)
-        self.assertIn(
-            "usage: snapkeep verify ARCHIVE",
-            stderr.getvalue(),
-        )
+        self.assertIn("usage: snapkeep verify ARCHIVE", stderr.getvalue())
 
     def test_verify_directory_returns_exit_code_one(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             stderr = io.StringIO()
-
             with redirect_stderr(stderr):
                 exit_code = main(["verify", temp_dir])
-
             self.assertEqual(exit_code, 1)
-            self.assertIn(
-                "archive is not a file",
-                stderr.getvalue(),
-            )
+            self.assertIn("archive is not a file", stderr.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

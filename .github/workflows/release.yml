@@ -4,31 +4,44 @@ on:
   release:
     types:
       - published
-  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    name: Build distributions
+    name: Build and validate distributions
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Check out release tag
         uses: actions/checkout@v6
-
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+      - name: Verify checkout matches published release tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          expected="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected" || {
+            echo "Checkout does not match release tag ${RELEASE_TAG}" >&2
+            exit 1
+          }
+          echo "Building ${RELEASE_TAG} at ${actual}"
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.13"
-
       - name: Install build tools
         run: python -m pip install --upgrade pip build twine
-
+      - name: Validate release tag against package version
+        run: python scripts/validate-release-tag.py "${{ github.event.release.tag_name }}"
       - name: Build package
         run: python -m build
-
       - name: Check package metadata
         run: python -m twine check dist/*
-
       - name: Upload distributions
         uses: actions/upload-artifact@v4
         with:
@@ -39,19 +52,17 @@ jobs:
     name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
-
     environment:
       name: pypi
-
+      url: https://pypi.org/p/snapkeep
     permissions:
+      contents: read
       id-token: write
-
     steps:
       - name: Download distributions
         uses: actions/download-artifact@v4
         with:
           name: python-package-distributions
           path: dist/
-
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

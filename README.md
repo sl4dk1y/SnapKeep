@@ -265,7 +265,6 @@ Planned areas include:
 
 - Improved `.backupignore` functionality
 - Windows, macOS, and Linux packaging
-- macOS Finder Quick Action integration
 - Windows Explorer integration
 - Linux file-manager integrations
 - Safer extraction and restore workflows
@@ -283,3 +282,61 @@ The current project targets Python 3.9 and newer.
 ## License
 
 MIT
+
+
+## Finder Quick Action (macOS)
+
+Install SnapKeep and the native Finder action from a checked-out repository:
+
+    cd SnapKeep
+    ./integrations/macos/install.sh
+
+The installer upgrades the snapkeep pipx environment from this checkout and
+installs **Create Project Snapshot** for the current macOS user. In Finder,
+select one or more project folders, right-click, then choose
+**Quick Actions → Create Project Snapshot**. Finder may also show the service
+under its Services menu.
+
+Each folder is passed to the existing snapkeep CLI independently. SnapKeep
+creates its verified ZIP in that project's sibling archive/ directory. When
+several folders are selected, each receives its own archive directory. Duplicate
+paths are processed once. The workflow shows a native macOS notification after processing. It reports
+that the snapshots were verified or summarizes any failures. Finder itself stays
+open and the Quick Action does not open Terminal.
+
+Automator intentionally keeps the wrapper process successful so its following
+native notification action runs even when a snapshot fails. For automation, run
+the wrapper with `SNAPKEEP_FINDER_STATUS_MODE=1` to receive nonzero status codes
+on failures; see `integrations/macos/README.md`.
+
+If the action does not appear, open **System Settings → Privacy & Security →
+Extensions → Finder** and enable **Create Project Snapshot**. macOS can also
+ask Finder or Automator to grant access to selected folders. The Quick Action
+uses the installed CLI; if it reports that SnapKeep cannot be found, run
+`command -v snapkeep` in Terminal and reinstall the CLI with pipx.
+
+To upgrade, pull or check out the desired source version and rerun
+integrations/macos/install.sh. To remove only the Finder action and its
+wrapper, run integrations/macos/uninstall.sh. The pipx CLI remains
+installed. The uninstaller refuses to remove unrecognized workflow contents. If you
+modified its workflow bundle, review it before uninstalling.
+
+The installer defaults to replacing the pipx CLI from the local checkout with
+`pipx install --force`. Set `SNAPKEEP_CLI_SOURCE=github` or `pypi` to install
+from those sources instead. See `integrations/macos/README.md` for the effects
+and upgrade behavior.
+
+## Security notes
+
+SnapKeep excludes common secret files by default. --include-secrets disables
+that protection. Symbolic links are skipped, output directories inside a source
+tree are excluded, and every archive is checked before SnapKeep reports
+success. Archive names are reserved atomically; an existing file is never
+truncated. Snapshot archives are a convenience for preserving project state,
+not a replacement for Git or disaster-recovery backups.
+
+## Release maintenance
+
+See docs/RELEASING.md for version and tag checks, local package validation,
+GitHub Environment setup, PyPI Trusted Publishing setup, and the safe release
+procedure.

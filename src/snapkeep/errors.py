@@ -8,3 +8,7 @@ class ArchiveError(SnapKeepError):
 
 class ArchiveVerificationError(ArchiveError):
     """Raised when a created archive fails integrity verification."""
+
+
+class IgnoreFileError(SnapKeepError):
+    """Raised when an ignore file cannot be read."""

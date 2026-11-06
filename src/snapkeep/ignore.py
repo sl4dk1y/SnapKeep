@@ -2,22 +2,36 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Iterable
 
+from snapkeep.errors import IgnoreFileError
 
-def load_ignore_patterns(ignore_file: Path) -> list[str]:
+
+def load_ignore_patterns(
+    ignore_file: Path,
+    *,
+    missing_ok: bool = True,
+) -> list[str]:
     """Load active patterns from a .backupignore file."""
-    if not ignore_file.exists():
-        return []
-
     patterns: list[str] = []
 
-    with ignore_file.open("r", encoding="utf-8") as file:
-        for raw_line in file:
-            line = raw_line.strip()
+    try:
+        with ignore_file.open("r", encoding="utf-8") as file:
+            for raw_line in file:
+                line = raw_line.strip()
 
-            if not line or line.startswith("#"):
-                continue
+                if not line or line.startswith("#"):
+                    continue
 
-            patterns.append(line)
+                patterns.append(line)
+    except FileNotFoundError:
+        if missing_ok:
+            return []
+        raise IgnoreFileError(
+            f"ignore file does not exist: {ignore_file}"
+        )
+    except (OSError, UnicodeError) as error:
+        raise IgnoreFileError(
+            f"could not read ignore file {ignore_file}: {error}"
+        ) from error
 
     return patterns
 
